@@ -20,8 +20,10 @@ export function toMarkdown(run) {
     `### local-ci ${head}`,
     '',
     `- 저장소: \`${run.repo}\` · 커밋: \`${run.sha.slice(0, 10)}\` · 이벤트: \`${run.event}\`${run.base ? ` · 기준: \`${run.base}\`` : ''}`,
-    `- 실행 환경: ${run.host.platform} · node ${run.host.node} · ${run.startedAt} · ${(run.ms / 1000).toFixed(0)}초`,
+    `- 실행 환경: ${run.host.platform} · node ${run.host.node}${run.host.bash ? ` · bash ${run.host.bash}` : ''} · 줄바꿈 ${run.host.eol ?? '-'} · ${run.startedAt} · ${(run.ms / 1000).toFixed(0)}초`,
+    `- 캐시: ${run.host.cache === '꺼짐' || !run.host.cache ? '꺼짐' : '켜짐(이 PC 캐시 폴더)'} · 대체 규칙: ${run.rules ?? 0}개`,
     '- GitHub Actions 대신 로컬 깨끗한 작업 사본에서 같은 단계를 돌린 결과입니다. 비밀 키가 필요한 단계는 돌리지 않습니다.',
+    ...(run.notes ?? []).map((n) => `- ⚠️ ${n}`),
     '',
   ];
   for (const wf of run.workflows) {
@@ -32,6 +34,7 @@ export function toMarkdown(run) {
         const extra = [st.note, st.exitCode !== undefined && st.exitCode !== 0 ? `종료 코드 ${st.exitCode}` : null, st.ms ? `${(st.ms / 1000).toFixed(1)}초` : null].filter(Boolean).join(' · ');
         lines.push(`  - ${ICON[st.status]} ${st.index}. ${st.name}${extra ? ` (${extra})` : ''}`);
       }
+      for (const c of j.cache ?? []) if (c.saved) lines.push(`  - 💾 캐시 저장: \`${c.key}\` (경로 ${c.saved}개)`);
       for (const w of j.warnings) lines.push(`  - ⚠️ ${w}`);
     }
   }
@@ -44,7 +47,7 @@ function gh(args, input) {
 
 /** origin 주소에서 owner/repo. */
 export function repoSlug(repoDir) {
-  const url = String(execFileSync('git', ['-C', repoDir, 'remote', 'get-url', 'origin'])).trim();
+  const url = String(execFileSync('git', ['-C', repoDir, 'remote', 'get-url', 'origin'], { stdio: ['ignore', 'pipe', 'pipe'] })).trim();
   const m = /github\.com[:/]([^/]+)\/([^/.]+?)(\.git)?$/.exec(url);
   if (!m) throw new Error(`GitHub origin 이 아닙니다: ${url}`);
   return `${m[1]}/${m[2]}`;
@@ -57,7 +60,7 @@ export function postToGitHub(run, { slug, pr, context = 'local-ci', mdFile }) {
     const jobs = run.jobs.filter((j) => j.file === wf.file);
     const fail = jobs.some((j) => j.status === 'failure');
     const partial = jobs.some((j) => j.partial);
-    const desc = `${fail ? '실패' : '통과'}${partial ? '(비밀 키·미지원 단계 건너뜀)' : ''} · ${run.host.platform} 로컬`.slice(0, 140);
+    const desc = `${fail ? '실패' : '통과'}${partial ? '(비밀 키·미지원·대체 규칙 건너뜀)' : ''} · ${run.host.platform} 로컬`.slice(0, 140);
     gh(['api', '--method', 'POST', `repos/${slug}/statuses/${run.sha}`, '-f', `state=${fail ? 'failure' : 'success'}`, '-f', `context=${context}/${wf.name}`, '-f', `description=${desc}`]);
     posted.push(`${context}/${wf.name}`);
   }

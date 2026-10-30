@@ -7,6 +7,8 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'cli.mjs');
+/* 시험이 이 PC 의 실제 캐시 폴더를 건드리지 않게 */
+process.env.LOCAL_CI_CACHE_DIR ||= mkdtempSync(path.join(os.tmpdir(), 'local-ci-cache-'));
 
 function repoWith(workflow, files = {}) {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'local-ci-test-'));

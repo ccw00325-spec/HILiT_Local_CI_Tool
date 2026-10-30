@@ -1,6 +1,6 @@
 {
   "name": "hilit-local-ci",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "GitHub Actions 워크플로를 로컬 깨끗한 작업 사본에서 그대로 돌리고, 결과를 커밋 상태·PR 댓글로 남기는 도구",
   "type": "module",
   "bin": { "local-ci": "src/cli.mjs" },
